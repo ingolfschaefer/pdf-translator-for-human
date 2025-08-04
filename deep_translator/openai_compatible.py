@@ -1,14 +1,19 @@
 import json
 import time
-import os,logging
+import os
+import logging
 
-import streamlit as st
 from .chatgpt import ChatGptTranslator
 
-logging.basicConfig(filename='application.log', level=logging.INFO, format='%(asctime)s - %(levelname)-5s %(lineno)d %(filename)s:%(funcName)s - %(message)s')
+logging.basicConfig(
+    filename='application.log', 
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)-5s %(lineno)d %(filename)s:%(funcName)s - %(message)s'
+)
 
 class OpenAICompatibleTranslator(ChatGptTranslator):
     """Translator that handles OpenAI compatible APIs with better error handling"""
+    
     def __init__(self, source="en", target="zh-CN", **kwargs):
         super().__init__(source=source, target=target, **kwargs)
         self.retry_count = 3
@@ -26,13 +31,13 @@ class OpenAICompatibleTranslator(ChatGptTranslator):
                 logging.info(f"Request OpenAI compatible api, base_url: {self.base_url}")
                 return super().translate(text, **kwargs)
             except json.JSONDecodeError:
-                logging.warn(f"Translation API response JSONDecodeError, will retry later...")
+                logging.warning(f"Translation API response JSONDecodeError, will retry later...")
                 if attempt == self.retry_count - 1:
                     logging.error(f"Translation API response error, using original text")
-                    st.warning(f"Translation API response error, using original text")
+                    # Instead of streamlit warning, just log and return original text
                     return text
                 time.sleep(self.retry_delay)
             except Exception as e:
                 logging.error(f"Translation error: {str(e)}")
-                st.error(f"Translation error: {str(e)}")
-                return text 
+                # Instead of streamlit error, just log and return original text
+                return text
