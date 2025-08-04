@@ -9,7 +9,6 @@ from deep_translator.constants import (
     OPEN_AI_BASE_URL_ENV_VAR,
     OPEN_AI_MODEL_ENV_VAR,
 )
-from deep_translator.exceptions import ApiKeyException
 
 
 class ChatGptTranslator(BaseTranslator):
@@ -28,16 +27,14 @@ class ChatGptTranslator(BaseTranslator):
         **kwargs,
     ):
         """
-        @param api_key: your openai api key.
+        @param api_key: your openai api key. Can be None for local models.
         @param source: source language
         @param target: target language
         @param model: OpenAI model to use
         @param base_url: custom OpenAI API base URL
         """
-        if not api_key:
-            raise ApiKeyException(env_var=OPEN_AI_ENV_VAR)
-
-        self.api_key = api_key
+        # Allow empty/None API key for local models
+        self.api_key = api_key if api_key else None
         self.model = model
         self.base_url = base_url
 
@@ -50,12 +47,23 @@ class ChatGptTranslator(BaseTranslator):
         """
         import openai
 
-        client = openai.OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url if self.base_url else None
-        )
+        # For local models, api_key can be None or empty string
+        # The OpenAI client will handle this appropriately
+        client_kwargs = {}
+        
+        # Only set api_key if it's provided (not None or empty)
+        if self.api_key:
+            client_kwargs["api_key"] = self.api_key
+        else:
+            # For local models, use a placeholder or None
+            client_kwargs["api_key"] = "local-model"
+            
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
 
-        prompt = f"Translate the text below into {self.target}.\n"
+        client = openai.OpenAI(**client_kwargs)
+
+        prompt = f"Translate the text below into {self.target}. Do not give explanations. Just the translation. No introductory text before.\n"
         prompt += f'Text: "{text}"'
 
         # if model is empty (for mlx_lm.server, the model should be default_model)
@@ -70,7 +78,6 @@ class ChatGptTranslator(BaseTranslator):
             ],
         )
         
-
         return response.choices[0].message.content
 
     def translate_file(self, path: str, **kwargs) -> str:

@@ -12,7 +12,10 @@ logging.basicConfig(
 )
 
 class OpenAICompatibleTranslator(ChatGptTranslator):
-    """Translator that handles OpenAI compatible APIs with better error handling"""
+    """Translator that handles OpenAI compatible APIs with better error handling
+    
+    Supports both remote APIs (with API keys) and local models (without API keys).
+    """
     
     def __init__(self, source="en", target="zh-CN", **kwargs):
         super().__init__(source=source, target=target, **kwargs)
@@ -26,18 +29,22 @@ class OpenAICompatibleTranslator(ChatGptTranslator):
         if not text.strip():
             return text
 
+        # Log whether we're using local or remote model
+        model_type = "local" if not self.api_key else "remote"
+        logging.info(f"Using {model_type} model with base_url: {self.base_url}")
+
         for attempt in range(self.retry_count):
             try:
-                logging.info(f"Request OpenAI compatible api, base_url: {self.base_url}")
                 return super().translate(text, **kwargs)
             except json.JSONDecodeError:
-                logging.warning(f"Translation API response JSONDecodeError, will retry later...")
+                logging.warning(f"Translation API response JSONDecodeError, attempt {attempt + 1}/{self.retry_count}")
                 if attempt == self.retry_count - 1:
-                    logging.error(f"Translation API response error, using original text")
-                    # Instead of streamlit warning, just log and return original text
+                    logging.error(f"Translation API response error after {self.retry_count} attempts, using original text")
                     return text
                 time.sleep(self.retry_delay)
             except Exception as e:
-                logging.error(f"Translation error: {str(e)}")
-                # Instead of streamlit error, just log and return original text
-                return text
+                logging.error(f"Translation error on attempt {attempt + 1}: {str(e)}")
+                if attempt == self.retry_count - 1:
+                    logging.error(f"Translation failed after {self.retry_count} attempts, using original text")
+                    return text
+                time.sleep(self.retry_delay)
